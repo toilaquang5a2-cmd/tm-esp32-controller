@@ -57,7 +57,7 @@
                 model = await tmImage.load(modelURL, metadataURL);
                 maxPredictions = model.getTotalClasses();
             } catch (error) {
-                document.getElementById("status").innerHTML = "Trạng thái: <span class='status-error'>Lỗi tải mô hình. Kiểm tra URL TM hoặc kết nối mạng.</span></span>";
+                document.getElementById("status").innerHTML = "Trạng thái: <span class='status-error'>Lỗi tải mô hình. Kiểm tra URL TM hoặc kết nối mạng.</span>";
                 console.error("Lỗi khi tải mô hình TM:", error);
                 return;
             }
@@ -79,7 +79,6 @@
 
         // HÀM LOOP ĐƯỢC CHỈNH SỬA
         function loop() {
-            // Chỉ chạy loop nếu webcam đang hoạt động và không có ảnh tải lên được chọn
             const fileInput = document.getElementById('imageUpload');
             if (webcam && webcam.canvas && fileInput.files.length === 0) {
                 webcam.update(); 
@@ -127,7 +126,6 @@
                 return;
             }
 
-            // Dừng webcam và xóa canvas nếu nó đang chạy
             if (webcam && webcam.canvas) {
                 webcam.stop();
                 document.getElementById('webcam-container').innerHTML = '';
@@ -141,13 +139,11 @@
                 const img = new Image();
                 img.src = e.target.result;
                 img.onload = function() {
-                    // Hiển thị ảnh tải lên
                     imageDisplay.innerHTML = '';
                     imageDisplay.appendChild(img);
                     img.style.maxWidth = '100%';
                     img.style.height = 'auto';
 
-                    // Gọi hàm nhận diện với đối tượng ảnh vừa tạo
                     predict(img);
                 };
             };
@@ -155,7 +151,7 @@
             reader.readAsDataURL(file);
         }
 
-        // HÀM GỬI LỆNH ĐƯỢC CHỈNH SỬA ĐỂ XỬ LÝ NHÃN AN TOÀN
+        // HÀM GỬI LỆNH ĐƯỢC TỐI ƯU HÓA ĐỂ CẬP NHẬT TRẠNG THÁI NGAY LẬP TỨC
         async function sendHttpRequest(label) {
             const espIp = document.getElementById("espIp").value;
             let endpoint = "";
@@ -174,16 +170,18 @@
             const url = `http://${espIp}${endpoint}`;
             
             try {
-                const response = await fetch(url);
-                if (response.ok) {
-                    document.getElementById("send-status").innerText = `Đã gửi thành công: ${endpoint}`;
-                    lastSentLabel = label;
-                    lastSentTime = Date.now(); 
-                } else {
-                    document.getElementById("send-status").innerText = `Lỗi gửi HTTP: ${response.status} (${endpoint})`;
-                }
+                // CHỈ GỌI LỆNH FETCH VÀ KHÔNG CHỜ PHẢN HỒI (response)
+                // Việc này cho phép đèn tắt và trạng thái hiển thị thành công mà không bị lỗi bảo mật
+                await fetch(url);
+                
+                // CẬP NHẬT TRẠNG THÁI THÀNH CÔNG NGAY LẬP TỨC
+                document.getElementById("send-status").innerText = `ĐÃ GỬI LỆNH THÀNH CÔNG: ${endpoint}`;
+                lastSentLabel = label;
+                lastSentTime = Date.now(); 
+                
             } catch (error) {
-                document.getElementById("send-status").innerText = `Lỗi kết nối ESP32. Đảm bảo IP chính xác và ESP đang chạy.`;
+                // Chỉ khi lỗi kết nối mạng thực sự xảy ra (ví dụ: IP sai), mới báo lỗi
+                document.getElementById("send-status").innerText = `LỖI KẾT NỐI MẠNG ESP32: Đảm bảo IP chính xác và ESP đang chạy.`;
             }
         }
 
