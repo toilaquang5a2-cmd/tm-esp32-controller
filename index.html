@@ -25,6 +25,9 @@
         <input type="text" id="espIp" value="192.168.0.125" placeholder="e.g. 192.168.1.100"> 
         <div id="status" class="result-box status-error">Trạng thái: Đang tải mô hình...</div>
 
+        <input type="file" id="imageUpload" accept="image/*" style="margin: 15px 0;">
+        <button onclick="handleUploadAndPredict()" style="padding: 10px; margin-bottom: 10px;">Nhận diện ảnh đã tải</button>
+        <div id="imageDisplay" style="margin-top: 10px;"></div>
         <div id="webcam-container"></div>
         <div class="result-box">
             <p>Nhận diện:</p>
@@ -35,10 +38,10 @@
 
     <script type="text/javascript">
         // ---------------------------------------------------------
-        // Cấu hình (ĐÃ CẬP NHẬT URL MÔ HÌNH VÀ GIẢM NGƯỠNG)
+        // Cấu hình
         // ---------------------------------------------------------
-        const URL = "https://teachablemachine.withgoogle.com/models/F8iU3qaRp/"; // URL MÔ HÌNH CŨ CỦA BẠN
-        const THRESHOLD = 0.60;       // Ngưỡng độ tin cậy được giảm xuống 60%
+        const URL = "https://teachablemachine.withgoogle.com/models/F8iU3qaRp/"; // URL MÔ HÌNH CŨ
+        const THRESHOLD = 0.60;       // Ngưỡng độ tin cậy tối thiểu (60%)
         const DEBOUNCE_TIME = 500;    
         
         // --- BIẾN TOÀN CỤC ---
@@ -74,16 +77,20 @@
             }
         }
 
-        async function loop() {
-            if (webcam && webcam.canvas) {
+        // HÀM LOOP ĐƯỢC CHỈNH SỬA
+        function loop() {
+            // Chỉ chạy loop nếu webcam đang hoạt động và không có ảnh tải lên được chọn
+            const fileInput = document.getElementById('imageUpload');
+            if (webcam && webcam.canvas && fileInput.files.length === 0) {
                 webcam.update(); 
-                await predict();
+                predict(webcam.canvas); // Gọi predict với canvas của webcam
             }
             window.requestAnimationFrame(loop);
         }
 
-        async function predict() {
-            const prediction = await model.predict(webcam.canvas);
+        // HÀM PREDICT ĐƯỢC CHỈNH SỬA
+        async function predict(imageElement) {
+            const prediction = await model.predict(imageElement);
             let currentLabel = "";
             let maxConfidence = 0;
 
@@ -108,6 +115,44 @@
             {
                 await sendHttpRequest(currentLabel);
             }
+        }
+        
+        // HÀM MỚI: XỬ LÝ TẢI ẢNH LÊN
+        function handleUploadAndPredict() {
+            const fileInput = document.getElementById('imageUpload');
+            const imageDisplay = document.getElementById('imageDisplay');
+            
+            if (fileInput.files.length === 0) {
+                alert("Vui lòng chọn một ảnh để nhận diện.");
+                return;
+            }
+
+            // Dừng webcam và xóa canvas nếu nó đang chạy
+            if (webcam && webcam.canvas) {
+                webcam.stop();
+                document.getElementById('webcam-container').innerHTML = '';
+                document.getElementById('status').innerHTML = "Trạng thái: <span class='status-ready'>Sẵn sàng (Chế độ Ảnh Tải Lên)</span>";
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const img = new Image();
+                img.src = e.target.result;
+                img.onload = function() {
+                    // Hiển thị ảnh tải lên
+                    imageDisplay.innerHTML = '';
+                    imageDisplay.appendChild(img);
+                    img.style.maxWidth = '100%';
+                    img.style.height = 'auto';
+
+                    // Gọi hàm nhận diện với đối tượng ảnh vừa tạo
+                    predict(img);
+                };
+            };
+
+            reader.readAsDataURL(file);
         }
 
         async function sendHttpRequest(label) {
