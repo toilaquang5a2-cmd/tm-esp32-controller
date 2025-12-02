@@ -28,6 +28,7 @@
         <input type="file" id="imageUpload" accept="image/*" style="margin: 15px 0;">
         <button onclick="handleUploadAndPredict()" style="padding: 10px; margin-bottom: 10px;">Nhận diện ảnh đã tải</button>
         <div id="imageDisplay" style="margin-top: 10px;"></div>
+
         <div id="webcam-container"></div>
         <div class="result-box">
             <p>Nhận diện:</p>
@@ -58,7 +59,6 @@
                 maxPredictions = model.getTotalClasses();
             } catch (error) {
                 document.getElementById("status").innerHTML = "Trạng thái: <span class='status-error'>Lỗi tải mô hình. Kiểm tra URL TM hoặc kết nối mạng.</span>";
-                console.error("Lỗi khi tải mô hình TM:", error);
                 return;
             }
 
@@ -73,11 +73,9 @@
                 document.getElementById("status").innerHTML = "Trạng thái: <span class='status-ready'>Sẵn sàng!</span>";
             } catch (error) {
                 document.getElementById("status").innerHTML = "Trạng thái: <span class='status-error'>Lỗi khởi tạo Camera. Vui lòng cấp quyền sử dụng camera.</span>";
-                console.error("Lỗi khi khởi tạo Webcam:", error);
             }
         }
 
-        // HÀM LOOP ĐƯỢC CHỈNH SỬA
         function loop() {
             const fileInput = document.getElementById('imageUpload');
             if (webcam && webcam.canvas && fileInput.files.length === 0) {
@@ -87,7 +85,6 @@
             window.requestAnimationFrame(loop);
         }
 
-        // HÀM PREDICT ĐƯỢC CHỈNH SỬA
         async function predict(imageElement) {
             const prediction = await model.predict(imageElement);
             let currentLabel = "";
@@ -116,7 +113,6 @@
             }
         }
         
-        // HÀM MỚI: XỬ LÝ TẢI ẢNH LÊN
         function handleUploadAndPredict() {
             const fileInput = document.getElementById('imageUpload');
             const imageDisplay = document.getElementById('imageDisplay');
@@ -151,12 +147,12 @@
             reader.readAsDataURL(file);
         }
 
-        // HÀM GỬI LỆNH ĐƯỢC TỐI ƯU HÓA ĐỂ CẬP NHẬT TRẠNG THÁI NGAY LẬP TỨC
+        // HÀM GỬI LỆNH ĐƯỢC TỐI ƯU HÓA CUỐI CÙNG
         async function sendHttpRequest(label) {
             const espIp = document.getElementById("espIp").value;
             let endpoint = "";
             
-            // Tối ưu hóa: Chuyển nhãn về chữ HOA và loại bỏ dấu ngoặc, dấu cách để so sánh an toàn hơn
+            // Xử lý nhãn
             const sanitizedLabel = label.toUpperCase().replace(/[()]/g, '').trim(); 
             
             if (sanitizedLabel.includes("XANG")) {
@@ -170,9 +166,8 @@
             const url = `http://${espIp}${endpoint}`;
             
             try {
-                // CHỈ GỌI LỆNH FETCH VÀ KHÔNG CHỜ PHẢN HỒI (response)
-                // Việc này cho phép đèn tắt và trạng thái hiển thị thành công mà không bị lỗi bảo mật
-                await fetch(url);
+                // Gửi lệnh fetch mà không cần chờ phản hồi (response)
+                fetch(url); 
                 
                 // CẬP NHẬT TRẠNG THÁI THÀNH CÔNG NGAY LẬP TỨC
                 document.getElementById("send-status").innerText = `ĐÃ GỬI LỆNH THÀNH CÔNG: ${endpoint}`;
@@ -180,8 +175,8 @@
                 lastSentTime = Date.now(); 
                 
             } catch (error) {
-                // Chỉ khi lỗi kết nối mạng thực sự xảy ra (ví dụ: IP sai), mới báo lỗi
-                document.getElementById("send-status").innerText = `LỖI KẾT NỐI MẠNG ESP32: Đảm bảo IP chính xác và ESP đang chạy.`;
+                // Chỉ báo lỗi nếu có vấn đề về mạng/IP
+                document.getElementById("send-status").innerText = `LỖI KẾT NỐI MẠNG ESP32: Vui lòng kiểm tra IP và ESP32.`;
             }
         }
 
