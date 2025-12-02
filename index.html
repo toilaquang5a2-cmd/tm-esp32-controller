@@ -40,7 +40,7 @@
         // ---------------------------------------------------------
         // Cấu hình
         // ---------------------------------------------------------
-        const URL = "https://teachablemachine.withgoogle.com/models/F8iU3qaRp/"; // URL MÔ HÌNH CŨ
+        const URL = "https://teachablemachine.withgoogle.com/models/F8iU3qaRp/"; 
         const THRESHOLD = 0.60;       // Ngưỡng độ tin cậy tối thiểu (60%)
         const DEBOUNCE_TIME = 500;    
         
@@ -83,7 +83,7 @@
             const fileInput = document.getElementById('imageUpload');
             if (webcam && webcam.canvas && fileInput.files.length === 0) {
                 webcam.update(); 
-                predict(webcam.canvas); // Gọi predict với canvas của webcam
+                predict(webcam.canvas); 
             }
             window.requestAnimationFrame(loop);
         }
@@ -155,13 +155,17 @@
             reader.readAsDataURL(file);
         }
 
+        // HÀM GỬI LỆNH ĐƯỢC CHỈNH SỬA ĐỂ XỬ LÝ NHÃN AN TOÀN
         async function sendHttpRequest(label) {
             const espIp = document.getElementById("espIp").value;
             let endpoint = "";
             
-            if (label.includes("XANG")) {
+            // Tối ưu hóa: Chuyển nhãn về chữ HOA và loại bỏ dấu ngoặc, dấu cách để so sánh an toàn hơn
+            const sanitizedLabel = label.toUpperCase().replace(/[()]/g, '').trim(); 
+            
+            if (sanitizedLabel.includes("XANG")) {
                 endpoint = "/gas";
-            } else if (label.includes("DIEN")) {
+            } else if (sanitizedLabel.includes("DIEN")) {
                 endpoint = "/electric";
             } else {
                 return; 
