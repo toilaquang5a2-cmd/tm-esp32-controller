@@ -57,7 +57,7 @@
                 model = await tmImage.load(modelURL, metadataURL);
                 maxPredictions = model.getTotalClasses();
             } catch (error) {
-                document.getElementById("status").innerHTML = "Trạng thái: <span class='status-error'>Lỗi tải mô hình. Kiểm tra URL TM hoặc kết nối mạng.</span>";
+                document.getElementById("status").innerHTML = "Trạng thái: <span class='status-error'>Lỗi tải mô hình. Kiểm tra URL TM hoặc kết nối mạng.</span></span>";
                 console.error("Lỗi khi tải mô hình TM:", error);
                 return;
             }
