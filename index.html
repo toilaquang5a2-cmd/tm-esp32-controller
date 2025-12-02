@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TM-ESP32 Controller</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin: 0; padding: 20px; background-color: #f4f4f9; }
+        .container { max-width: 600px; margin: auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        #webcam-container canvas { width: 100%; max-width: 400px; border-radius: 4px; }
+        .result-box { margin-top: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; background-color: #e9e9e9; text-align: left;}
+        .label-output { font-size: 1.2em; font-weight: bold; }
+        .status-ready { color: green; }
+        .status-error { color: red; }
+        input[type="text"] { width: 90%; padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🚗 TM-ESP32 Controller</h2>
+        
+        <label for="espIp">Nhập IP ESP32:</label>
+        <input type="text" id="espIp" value="192.168.0.125" placeholder="e.g. 192.168.1.100"> 
+        <div id="status" class="result-box status-error">Trạng thái: Đang tải mô hình...</div>
+
+        <div id="webcam-container"></div>
+        <div class="result-box">
+            <p>Nhận diện:</p>
+            <div id="label-container" class="label-output">Chờ khởi động camera...</div>
+            <p>Gửi trạng thái: <span id="send-status">Chưa gửi</span></p>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        // ---------------------------------------------------------
+        // Cấu hình (ĐÃ CẬP NHẬT URL MÔ HÌNH MỚI)
+        // ---------------------------------------------------------
+        const URL = "https://teachablemachine.withgoogle.com/models/MnO0i6jSW/"; 
+        const THRESHOLD = 0.85;       // Ngưỡng độ tin cậy tối thiểu
+        const DEBOUNCE_TIME = 500;    // Thời gian tối thiểu giữa 2 request (ms)
+        
+        // --- BIẾN TOÀN CỤC ---
+        let model, webcam, maxPredictions;
+        let lastSentLabel = "";
+        let lastSentTime = 0;
+
+        async function init() {
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            // Bắt đầu tải mô hình
+            try {
+                model = await tmImage.load(modelURL, metadataURL);
+                maxPredictions = model.getTotalClasses();
+            } catch (error) {
+                // Nếu tải mô hình thất bại
+                document.getElementById("status").innerHTML = "Trạng thái: <span class='status-error'>Lỗi tải mô hình. Vui lòng kiểm tra console.</span>";
+                console.error("Lỗi khi tải mô hình TM:", error);
+                return;
+            }
+
+            // Nếu tải mô hình thành công, bắt đầu khởi tạo webcam
+            const flip = true; 
+            webcam = new tmImage.Webcam(400, 400, flip); 
+            
+            try {
+                await webcam.setup(); 
+                await webcam.play();
+                document.getElementById("webcam-container").appendChild(webcam.canvas);
+                window.requestAnimationFrame(loop);
+                document.getElementById("status").innerHTML = "Trạng thái: <span class='status-ready'>Sẵn sàng!</span>";
+            } catch (error) {
+                // Nếu khởi tạo webcam thất bại (thường do không cấp quyền)
+                document.getElementById("status").innerHTML = "Trạng thái: <span class='status-error'>Lỗi khởi tạo Camera. Vui lòng cấp quyền sử dụng camera.</span>";
+                console.error("Lỗi khi khởi tạo Webcam:", error);
+            }
+        }
+
+        async function loop() {
+            if (webcam && webcam.canvas) {
+                webcam.update(); 
+                await predict();
+            }
+            window.requestAnimationFrame(loop);
+        }
+
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            let currentLabel = "";
+            let maxConfidence = 0;
+
+            for (let i = 0; i < maxPredictions; i++) {
+                const classPrediction = prediction[i];
+                const label = classPrediction.className.toUpperCase();
+                const confidence = parseFloat(classPrediction.probability);
+                
+                if (confidence > maxConfidence) {
+                    maxConfidence = confidence;
+                    currentLabel = label;
+                }
+            }
+
+            document.getElementById("label-container").innerText = 
+                `${currentLabel} (${(maxConfidence * 100).toFixed(1)}%)`;
+
+            const currentTime = Date.now();
+            
+            if (maxConfidence >= THRESHOLD && 
+                (currentLabel !== lastSentLabel || (currentTime - lastSentTime > DEBOUNCE_TIME))) 
+            {
+                await sendHttpRequest(currentLabel);
+            }
+        }
+
+        async function sendHttpRequest(label) {
+            const espIp = document.getElementById("espIp").value;
+            let endpoint = "";
+            
+            if (label.includes("XANG")) {
+                endpoint = "/gas";
+            } else if (label.includes("DIEN")) {
+                endpoint = "/electric";
+            } else {
+                return; 
+            }
+
+            const url = `http://${espIp}${endpoint}`;
+            
+            try {
+                const response = await fetch(url);
+                if (response.ok) {
+                    document.getElementById("send-status").innerText = `Đã gửi thành công: ${endpoint}`;
+                    lastSentLabel = label;
+                    lastSentTime = Date.now(); 
+                } else {
+                    document.getElementById("send-status").innerText = `Lỗi gửi HTTP: ${response.status} (${endpoint})`;
+                }
+            } catch (error) {
+                document.getElementById("send-status").innerText = `Lỗi kết nối ESP32. Đảm bảo IP chính xác và ESP đang chạy.`;
+            }
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
